@@ -75,7 +75,7 @@ namespace Player
                 
                 if (playerController != null)
                 {
-                    playerController.ForwardSpeed = carConfig.Speed * 5;
+                    playerController.ForwardSpeed = carConfig.Speed * 3;
                 }
             }
         }
