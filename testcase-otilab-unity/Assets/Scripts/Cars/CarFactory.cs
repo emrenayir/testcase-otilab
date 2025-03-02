@@ -64,8 +64,8 @@ namespace Cars
             }
 
             // Define the range of possible values
-            int minIndex = Mathf.Max(0, currentIndex - 2); 
-            int maxIndex = Mathf.Min(carConfigurations.Count - 1, currentIndex + 2); 
+            int minIndex = Mathf.Max(0, currentIndex - 4); 
+            int maxIndex = Mathf.Min(carConfigurations.Count - 1, currentIndex + 4); 
 
             // Get a random index within this range
             int randomIndex = Random.Range(minIndex, maxIndex + 1);
