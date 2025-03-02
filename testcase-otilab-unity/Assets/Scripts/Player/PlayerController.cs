@@ -7,20 +7,28 @@ namespace Player
     {
         [SerializeField] private float laneDistance = 5f;
         [SerializeField] private float laneChangeSpeed = 10f;
-        [SerializeField] private float rotationAngle = 15f;
-        [SerializeField] private float rotationSpeed = 5f;
         [SerializeField] private float minSwipeDistance = 50f;
+        [SerializeField] private float forwardSpeed = 10f;
+        [SerializeField] private float laneChangeRotationAngle = 15f;
+        [SerializeField] private float rotationResetSpeed = 20f;
+        [SerializeField] private float rotationResetThreshold = 0.8f;
 
         public float LaneDistance => laneDistance;
+        public float ForwardSpeed
+        {
+            get { return forwardSpeed; }
+            set { forwardSpeed = value; }
+        }
 
         private int currentLane = 0;
         private float targetX;
-        private float currentRotation;
-        private float targetRotation;
+        private float previousX;
         private bool isChangingLane;
         private bool canControl = false;
         private Vector2 touchStartPos;
         private bool isSwiping = false;
+        private bool isMoving = false;
+        private bool isWaitingForInput = false;
 
         private void OnEnable()
         {
@@ -45,35 +53,102 @@ namespace Player
 
         private void Update()
         {
+            CheckForClickToStart();
+            
             if (!canControl) return;
-
-            if (Input.GetKeyDown(KeyCode.A) || Input.GetKeyDown(KeyCode.LeftArrow))
+            
+            if (isMoving)
             {
-                TryChangeLane(-1);
+                transform.Translate(Vector3.forward * (forwardSpeed * Time.smoothDeltaTime));
             }
-            else if (Input.GetKeyDown(KeyCode.D) || Input.GetKeyDown(KeyCode.RightArrow))
-            {
-                TryChangeLane(1);
-            }
-
+            
             HandleTouchInput();
 
+            previousX = transform.position.x;
+            
             float newX = Mathf.MoveTowards(transform.position.x, targetX, laneChangeSpeed * Time.deltaTime);
             newX = Mathf.Clamp(newX, -laneDistance/2, laneDistance/2);
-            transform.position = new Vector3(newX, transform.position.y, transform.position.z);
+            
+            Vector3 worldPosition = transform.position;
+            worldPosition.x = newX;
+            transform.position = worldPosition;
 
-            float targetRotationClamped = Mathf.Clamp(targetRotation, -rotationAngle, rotationAngle);
-            currentRotation = Mathf.LerpAngle(currentRotation, targetRotationClamped, rotationSpeed * Time.deltaTime);
-            currentRotation = Mathf.Clamp(currentRotation, -rotationAngle, rotationAngle);
-            transform.rotation = Quaternion.Euler(0, currentRotation, 0);
+            float laneChangeProgress = 1f - (Mathf.Abs(transform.position.x - targetX) / (laneDistance));
+            laneChangeProgress = Mathf.Clamp01(laneChangeProgress);
+
+            if (isChangingLane)
+            {
+                float movementDirection = newX - previousX;
+                if (Mathf.Abs(movementDirection) > 0.001f)
+                {
+                    if (laneChangeProgress < rotationResetThreshold)
+                    {
+                        float targetRotationY = Mathf.Sign(movementDirection) * laneChangeRotationAngle;
+                        Quaternion targetRotation = Quaternion.Euler(0, targetRotationY, 0);
+                        transform.rotation = Quaternion.Lerp(transform.rotation, targetRotation, Time.deltaTime * laneChangeSpeed);
+                    }
+                    else
+                    {
+                        transform.rotation = Quaternion.Lerp(transform.rotation, Quaternion.identity, Time.deltaTime * rotationResetSpeed);
+                    }
+                }
+            }
+            else
+            {
+                transform.rotation = Quaternion.Lerp(transform.rotation, Quaternion.identity, Time.deltaTime * rotationResetSpeed);
+            }
 
             if (Mathf.Abs(transform.position.x - targetX) < 0.01f)
             {
-                targetRotation = 0f;
-                currentRotation = 0f;
-                transform.rotation = Quaternion.identity;
                 isChangingLane = false;
             }
+        }
+
+        private void CheckForClickToStart()
+        {
+            if (!isWaitingForInput) return;
+            
+            if (Input.touchCount > 0 && Input.GetTouch(0).phase == TouchPhase.Began)
+            {
+                if (UnityEngine.EventSystems.EventSystem.current != null)
+                {
+                    bool isOverUI = UnityEngine.EventSystems.EventSystem.current.IsPointerOverGameObject(Input.GetTouch(0).fingerId);
+                    if (!isOverUI)
+                    {
+                        StartMoving();
+                    }
+                }
+                else
+                {
+                    StartMoving();
+                }
+            }
+            
+            if (Input.GetMouseButtonDown(0))
+            {
+                bool isOverUI = false;
+                if (UnityEngine.EventSystems.EventSystem.current != null)
+                {
+                    isOverUI = UnityEngine.EventSystems.EventSystem.current.IsPointerOverGameObject();
+                }
+                else
+                {
+                    StartMoving();
+                    return;
+                }
+                
+                if (!isOverUI)
+                {
+                    StartMoving();
+                }
+            }
+        }
+
+        private void StartMoving()
+        {
+            isWaitingForInput = false;
+            isMoving = true;
+            canControl = true;
         }
 
         private void HandleTouchInput()
@@ -147,28 +222,42 @@ namespace Player
             
             currentLane = newLane;
             targetX = (currentLane == 0) ? -laneDistance / 2 : laneDistance / 2;
-            targetRotation = (currentLane == 0) ? -rotationAngle : rotationAngle;
             isChangingLane = true;
         }
 
         private void HandleGameStart()
         {
             canControl = false;
+            isWaitingForInput = true;
+            isMoving = false;
+            Invoke("CheckInputFlags", 1.0f);
+        }
+
+        private void CheckInputFlags()
+        {
+            if (!isWaitingForInput && !isMoving)
+            {
+                isWaitingForInput = true;
+            }
         }
 
         private void HandleGameFail()
         {
             canControl = false;
+            isMoving = false;
+            isWaitingForInput = false;
         }
 
         private void HandleGamePause()
         {
             canControl = false;
+            isMoving = false;
         }
 
         private void HandleGameResume()
         {
             canControl = true;
+            isMoving = true;
         }
 
         public void EnableControl()
@@ -181,15 +270,18 @@ namespace Player
             targetX = transform.position.x;
             currentLane = 0;
             targetX = -laneDistance / 2;
-            transform.position = new Vector3(targetX, transform.position.y, transform.position.z);
             
-            targetRotation = 0f;
-            currentRotation = 0f;
+            Vector3 worldPosition = transform.position;
+            worldPosition.x = targetX;
+            transform.position = worldPosition;
+            
             transform.rotation = Quaternion.identity;
             
             isChangingLane = false;
             canControl = false;
             isSwiping = false;
+            isMoving = false;
+            isWaitingForInput = false;
         }
     }
 }

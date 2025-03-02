@@ -378,8 +378,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 67a36e454c50e45108bca15f1e87fdd9, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  initialHealth: 2
-  forwardSpeed: 150
+  initialHealth: 3
   carRenderer: {fileID: 7470569720229893445}
   carConfigurations:
   - {fileID: 11400000, guid: 94bd0f44ca52b4b0aa5e259315de00b7, type: 2}
@@ -416,10 +415,12 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   laneDistance: 5
-  laneChangeSpeed: 10
-  rotationAngle: 15
-  rotationSpeed: 5
+  laneChangeSpeed: 5
   minSwipeDistance: 50
+  forwardSpeed: 10
+  laneChangeRotationAngle: 20
+  rotationResetSpeed: 20
+  rotationResetThreshold: 0.8
 --- !u!54 &3930754003707264496
 Rigidbody:
   m_ObjectHideFlags: 0
